@@ -1,6 +1,7 @@
 #include "CSVParser.h"
 #include <fstream>
 #include <iostream>
+#include "Exceptions.h"
 
 CSVParser::CSVParser() {}
 
@@ -25,6 +26,7 @@ void CSVParser::PrintTable() {
         for (int col = 0; col < colNames.size(); col++) {
             std::string el = rowColMap[rowNames[row]][colNames[col]];
             if (el[0] == '=') {
+                usedFormulas.clear();
                 std::cout << CalculateFormula(el) << rowDel;
             }
             else {
@@ -48,12 +50,18 @@ void CSVParser::ParseFile(std::string filename, std::string delimiter) {
 
 void CSVParser::ParseCSVLines(std::string delimiter) {
     std::vector<std::string> splittedRow;
+    std::vector<std::string> formulaArgs;
+    std::string formulaOp;
     std::string currentRow;
     uint64_t colNum;
+    int rowLength = 0;
+    int rowNum = 1;
 
     colNames = Split(rawLines[0], delimiter);
     colNames.erase(colNames.begin());
     rawLines.erase(rawLines.begin());
+
+    rowLength = rawLines.size();
 
     for (auto row : rawLines) {
         splittedRow = Split(row, delimiter);
@@ -62,7 +70,15 @@ void CSVParser::ParseCSVLines(std::string delimiter) {
         splittedRow.erase(splittedRow.begin());
         colNum = 0;
 
+        if (splittedRow.size() != rowLength) {
+            throw InvalidRowLengthException(rowNum);
+        }
+
         for (auto value : splittedRow) {
+            if (!ValidateCellValue(value)) {
+                throw InvalidCellValueException(rowNum, colNum + 1);
+            }
+
             if (value[0] == '=') {
                 formulas[value] = nullptr;
             }
@@ -70,10 +86,18 @@ void CSVParser::ParseCSVLines(std::string delimiter) {
             rowColMap[currentRow][colNames[colNum]] = value;
             colNum += 1;
         }
+        rowNum += 1;
     }
 }
 
 int CSVParser::CalculateFormula(std::string formula) {
+    if (usedFormulas.find(formula) != usedFormulas.end()) {
+        throw FormulaLoopException(formula);
+    }
+    else {
+        usedFormulas[formula] = formula;
+    }
+
     if (formulas[formula] != nullptr) {
         return *formulas[formula];
     }
@@ -85,6 +109,12 @@ int CSVParser::CalculateFormula(std::string formula) {
     std::string arg0Str = colRowSearchMap[args[0]] == "" ? args[0] : colRowSearchMap[args[0]];
     std::string arg1Str = colRowSearchMap[args[1]] == "" ? args[1] : colRowSearchMap[args[1]];
 
+    if (!ValidateCellValue(arg0Str)) {
+        throw InvalidCellAddressException(arg0Str);
+    }
+    if (!ValidateCellValue(arg1Str)) {
+        throw InvalidCellAddressException(arg1Str);
+    }
     arg0 = CalcArg(arg0Str);
     arg1 = CalcArg(arg1Str);
     
@@ -130,6 +160,18 @@ int CSVParser::CalcArg(std::string& argStr) {
 void CSVParser::SaveResult(int** dest, int result) {
     *dest = new int;
     std::memcpy(*dest, &result, sizeof(result));
+}
+
+bool CSVParser::ValidateCellValue(std::string value) {
+    if (value[0] == '=') return true;
+    if (value.size() == 0) return false;
+
+    for (auto el : value) {
+        if (el < '0' || el > '9') {
+            return false;
+        }
+    }
+    return true;
 }
 
 void CSVParser::Clear() {
