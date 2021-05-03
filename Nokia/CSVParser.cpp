@@ -102,6 +102,11 @@ int CSVParser::CalculateFormula(std::string formula) {
         return *formulas[formula];
     }
     std::string op = GetOp(formula);
+
+    if (op.empty()) {
+        throw InvalidCellAddressException(formula);
+    }
+
     int arg0, arg1, result;
     formula.erase(formula.begin());
     std::vector<std::string> args = Split(formula, op);
@@ -202,6 +207,7 @@ std::string CSVParser::GetOp(std::string formula) {
             return "*";
         }
     }
+    return "";
 }
 
 std::vector<std::string> CSVParser::Split(std::string str, std::string delimiter) {
