@@ -66,7 +66,7 @@ void CSVParser::ParseCSVLines(std::string delimiter) {
     colNames.erase(colNames.begin());
     rawLines.erase(rawLines.begin());
 
-    rowLength = rawLines.size();
+    rowLength = colNames.size();
 
     for (auto row : rawLines) {
         splittedRow = Split(row, delimiter);
