@@ -33,14 +33,14 @@ std::vector<std::string> Split(std::string& str, std::string& delimiter) {
 }
 
 // Parses CSV file lines. Returns list of formulas to calculate.
-std::vector<std::string> ParseCSVLines(std::vector<std::string> rows,
-                                       // ColRow -> value
-                                       std::unordered_map<std::string, std::string>& colRowSearchMap,
-                                       // Row -> Col -> value
-                                       std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& rowColMap) {
+std::unordered_map<std::string, int*> ParseCSVLines(std::vector<std::string> rows,
+                                                    // ColRow -> value
+                                                    std::unordered_map<std::string, std::string>& colRowSearchMap,
+                                                    // Row -> Col -> value
+                                                    std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& rowColMap) {
     std::vector<std::string> splittedRow;
     std::vector<std::string> headerRow;
-    std::vector<std::string> formulas;
+    std::unordered_map<std::string, int*> formulas;
     uint64_t colNum = 0;
     std::string delimiter = ",";
     std::string rowName;
@@ -57,7 +57,7 @@ std::vector<std::string> ParseCSVLines(std::vector<std::string> rows,
 
         for (auto value : splittedRow) {
             if (value[0] == '=') {
-                formulas.push_back(value);
+                formulas[value] = nullptr;
             }
             colRowSearchMap[headerRow[colNum] + rowName] = value;
             rowColMap[rowName][headerRow[colNum]] = value;
@@ -83,25 +83,67 @@ std::string GetOp(std::string formula) {
     }
 }
 
-int CalculateFormula(std::unordered_map<std::string, std::string> colRowSearchMap, std::string formula) {
+void SaveResult(int** dest, int result) {
+    *dest = new int;
+    std::memcpy(*dest, &result, sizeof(result));
+}
+
+int CalculateFormula(std::unordered_map<std::string, std::string> colRowSearchMap, std::unordered_map<std::string, int*>& formulaSearchMap, std::string formula) {
+    if (formulaSearchMap[formula] != nullptr) {
+        return *formulaSearchMap[formula];
+    }
     std::string op = GetOp(formula);
-    int arg0, arg1;
+    int arg0, arg1, result;
     formula.erase(formula.begin());
     std::vector<std::string> args = Split(formula, op);
 
-    arg0 = std::stoi(colRowSearchMap[args[0]]);
-    arg1 = std::stoi(colRowSearchMap[args[1]]);
+    std::string arg0Str = colRowSearchMap[args[0]] == "" ? args[0] : colRowSearchMap[args[0]];
+    std::string arg1Str = colRowSearchMap[args[1]] == "" ? args[1] : colRowSearchMap[args[1]];
+
+    if (arg0Str[0] == '=') {
+        if (formulaSearchMap[arg0Str] == nullptr) {
+            arg0 = CalculateFormula(colRowSearchMap, formulaSearchMap, formula);
+            SaveResult(&formulaSearchMap[arg0Str], arg0, arg0Str);
+        }
+        else {
+            arg0 = *formulaSearchMap[arg0Str];
+        }
+    }
+    else {
+        arg0 = std::stoi(arg0Str);
+    }
+
+    if (arg1Str[0] == '=') {
+        if (formulaSearchMap[arg1Str] == nullptr) {
+            arg1 = CalculateFormula(colRowSearchMap, formulaSearchMap, arg1Str);
+            SaveResult(&formulaSearchMap[arg1Str], arg1, arg1Str);
+        }
+        else {
+            arg1 = *formulaSearchMap[arg1Str];
+        }
+    }
+    else {
+        arg1 = std::stoi(arg1Str);
+    }
 
     switch (op[0]) {
     case '-':
-        return arg0 - arg1;
+        result = arg0 - arg1;
+        break;
     case '+':
-        return arg0 + arg1;
+        result = arg0 + arg1;
+        break;
     case '/':
-        return arg0 / arg1;
+        result = arg0 / arg1;
+        break;
     case '*':
-        return arg0 * arg1;
+        result = arg0 * arg1;
+        break;
     }
+
+    formulaSearchMap["=" + formula] = new int;
+    std::memcpy(formulaSearchMap["=" + formula], &result, sizeof(result));
+    return result;
 }
 
 void PrintTable(std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& colRowMap) {
@@ -119,10 +161,10 @@ int main() {
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> rowColMap;
 
     std::vector<std::string> lines = ParseFile(filename);
-    std::vector<std::string> formulas = ParseCSVLines(lines, colRowSearchMap, rowColMap);
+    std::unordered_map<std::string, int*> formulas = ParseCSVLines(lines, colRowSearchMap, rowColMap);
 
     for (auto formula : formulas) {
-        std::cout << formula << " " << CalculateFormula(colRowSearchMap, formula) << std::endl;
+        std::cout << formula.first << " " << CalculateFormula(colRowSearchMap, formulas, formula.first) << std::endl;
     }
 
     return 0;
