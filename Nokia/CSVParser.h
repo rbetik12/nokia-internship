@@ -7,7 +7,6 @@ public:
     CSVParser();
     ~CSVParser();
 
-    std::vector<std::string> GetParsedTable();
     void PrintTable();
     void ParseFile(std::string filename, std::string delimiter);
 private:

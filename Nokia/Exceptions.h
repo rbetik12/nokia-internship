@@ -54,3 +54,10 @@ public:
 private:
     std::string whatStr;
 };
+
+class ZeroDivisionException : public std::exception {
+public:
+    const char* what() const throw () {
+        return "Zero division!";
+    }
+};

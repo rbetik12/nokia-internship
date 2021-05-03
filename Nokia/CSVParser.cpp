@@ -9,12 +9,11 @@ CSVParser::~CSVParser() {
     Clear();
 }
 
-std::vector<std::string> CSVParser::GetParsedTable() {
-    return std::vector<std::string>();
-}
-
 void CSVParser::PrintTable() {
     std::string rowDel = "\t";
+    int result;
+    std::vector<std::string> errorsList;
+
     std::cout << rowDel;
     for (auto col : colNames) {
         std::cout << col << rowDel;
@@ -27,7 +26,13 @@ void CSVParser::PrintTable() {
             std::string el = rowColMap[rowNames[row]][colNames[col]];
             if (el[0] == '=') {
                 usedFormulas.clear();
-                std::cout << CalculateFormula(el) << rowDel;
+                try {
+                    result = CalculateFormula(el);
+                    std::cout << result << rowDel;
+                }
+                catch (std::exception& e) {
+                    std::cout << "#ERROR" << rowDel;
+                }
             }
             else {
                 std::cout << el << rowDel;
@@ -131,6 +136,9 @@ int CSVParser::CalculateFormula(std::string formula) {
         result = arg0 + arg1;
         break;
     case '/':
+        if (arg1 == 0) {
+            throw ZeroDivisionException();
+        }
         result = arg0 / arg1;
         break;
     case '*':
